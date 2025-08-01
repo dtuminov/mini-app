@@ -1,0 +1,6 @@
+{
+	"host": "localhost",
+	"user": "ruby",
+	"password": "rubyWHO",
+	"database": "invest_cards_bot_db"
+}
