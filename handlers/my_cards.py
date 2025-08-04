@@ -1,185 +1,183 @@
 # Aiogram imports
-from aiogram import Dispatcher, filters, types, Bot
+from aiogram import Dispatcher, types, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import any_state
 
 # Keyboards
 from keyboards.inline_keyboards import get_rarity_choose_ikb, get_opened_card_ikb
 
 # Modules
-from modules.cfg_loader import *
+from modules.cfg_loader import load_config
 
 # Database
 from database.orm import ORM as orm
 
+# Initialize global variables
+g_bot = None
+rarities = None
 
-# loader
+
 def load_my_cards_handler(dispatcher: Dispatcher, bot: Bot):
+    global g_bot, rarities
+    g_bot = bot
+    rarities = load_config("./cfg/rarities.json")
 
-	# init
-	global g_bot, rarities
-	g_bot = bot
+    # Main message handler
+    dispatcher.message.register(
+        process_my_cards_categories_msg,
+        lambda message: message.text == "💼 Мои карты",
+        StateFilter(any_state)
+    )
 
-	rarities = load_config("./cfg/rarities.json")
+    # Callback handlers
+    dispatcher.callback_query.register(
+        process_my_cards_pick_category,
+        lambda x: x.data.startswith("my_cards_"),
+        StateFilter(any_state)
+    )
 
-	# main handler
-	dispatcher.message.register(
-		process_myCards_categories_msg,
-		lambda message: message.text == "💼 Мои карты",
-		StateFilter('*')
-	)
+    dispatcher.callback_query.register(
+        process_my_cards_categories_query,
+        lambda x: x.data == "opened_cards_back",
+        StateFilter(any_state)
+    )
 
-	# pick category
-	dispatcher.callback_query.register(
-		process_myCards_pickCategory,
-		lambda x: x.data.startswith("my_cards_"),
-		StateFilter('*')
-	)
+    dispatcher.callback_query.register(
+        process_my_cards_pick_category_next,
+        lambda x: x.data == "opened_cards_next_page",
+        StateFilter(any_state)
+    )
 
-	# back
-	dispatcher.callback_query.register(
-		process_myCards_categories_query,
-		lambda x: x.data == "opened_cards_back",
-		StateFilter('*')
-	)
+    dispatcher.callback_query.register(
+        process_my_cards_pick_category_prev,
+        lambda x: x.data == "opened_cards_prev_page",
+        StateFilter(any_state)
+    )
 
-	dispatcher.callback_query.register(
-		process_myCards_pickCategory_next,
-		lambda x: x.data == "opened_cards_next_page",
-		StateFilter('*')
-	)
-
-	dispatcher.callback_query.register(
-		process_myCards_pickCategory_prev,
-		lambda x: x.data == "opened_cards_prev_page",
-		StateFilter('*')
-	)
-
-	dispatcher.callback_query.register(
-		process_myCards_pickCategory_page_status,
-		lambda x: x.data == "opened_cards_page_status",
-		StateFilter('*')
-	)
+    dispatcher.callback_query.register(
+        process_my_cards_page_status,
+        lambda x: x.data == "opened_cards_page_status",
+        StateFilter(any_state)
+    )
 
 
-async def process_myCards_categories_msg(message: types.Message, state: FSMContext):
+async def process_my_cards_categories_msg(message: types.Message, state: FSMContext):
+    """Обработчик сообщения с кнопкой 'Мои карты'"""
+    await state.clear()  # Очищаем состояние вместо reset_data()
 
-	await state.reset_data()
-
-	msg_text = f"💼 Выберите редкость карт:"
-
-	await message.answer(
-		text = msg_text,
-		reply_markup = get_rarity_choose_ikb()
-	)
+    await message.answer(
+        text="💼 Выберите редкость карт:",
+        reply_markup=get_rarity_choose_ikb()
+    )
 
 
-async def process_myCards_categories_query(query: types.CallbackQuery, state: FSMContext):
-
-	# reset rarity
-	await state.reset_data()
-
-	await query.message.delete()
-
-	msg_text = f"💼 Выберите редкость карт:"
-
-	await query.message.answer(
-		text = msg_text,
-		reply_markup = get_rarity_choose_ikb()
-	)
-
-	await g_bot.answer_callback_query(query.id)
+async def process_my_cards_categories_query(query: types.CallbackQuery, state: FSMContext):
+    """Обработчик кнопки 'Назад'"""
+    await state.clear()
+    await query.message.delete()
+    await query.message.answer(
+        text="💼 Выберите редкость карт:",
+        reply_markup=get_rarity_choose_ikb()
+    )
+    await query.answer()
 
 
-async def process_myCards_pickCategory(query: types.CallbackQuery, state: FSMContext):
+async def process_my_cards_pick_category(query: types.CallbackQuery, state: FSMContext):
+    """Обработчик выбора категории карт"""
+    if query.data.startswith("my_cards_"):
+        rarity = query.data.split("_")[-1]
+        offset = 0
+        await state.update_data(
+            my_cards_rarity=rarity,
+            my_cards_offset=offset
+        )
+    else:
+        data = await state.get_data()
+        rarity = data.get("my_cards_rarity")
+        offset = data.get("my_cards_offset", 0)
 
-	if query.data.startswith("my_cards_"):
-		rarity = query.data.split("_")[-1]
-		offset = 0
+    if not rarity:
+        await query.answer("Ошибка выбора категории!")
+        return
 
-		# save data
-		async with state.proxy() as storage:
-			storage["my_cards_rarity"] = rarity
-			storage["my_cards_offset"] = offset
-	else:
-		async with state.proxy() as storage:
-			rarity = storage.get("my_cards_rarity")
-			offset = storage.get("my_cards_offset")
+    # Получаем карты выбранной редкости
+    all_cards_by_rarity = [x.card_id for x in await orm.get_cards_by_rarity(rarity)]
+    inventory = await orm.get_inventory(query.from_user.id)
+    my_cards_by_rarity = [x for x in inventory if x in all_cards_by_rarity]
 
-	if rarity is None or offset is None:
-		await query.answer("Ошибка!")
-		await g_bot.answer_callback_query(query.id)
-		return
+    if not my_cards_by_rarity:
+        await query.answer("☹️ У вас еще нет карт выбранной редкости")
+        return
 
-	# get cards for this rarity
-	all_cards_by_rarity = [x.card_id for x in await orm.get_cards_by_rarity(rarity)]
-	my_cards_by_rarity = [x for x in await orm.get_inventory(query.from_user.id) if x in all_cards_by_rarity]
-	
-	# get unique values
-	my_cards_by_rarity_unique = list(set(my_cards_by_rarity))
-	my_cards_by_rarity_unique.sort()
+    # Получаем уникальные карты
+    unique_cards = sorted(list(set(my_cards_by_rarity)))
+    if offset >= len(unique_cards):
+        offset = 0
+        await state.update_data(my_cards_offset=offset)
 
-	if len(my_cards_by_rarity) == 0:
-		await query.answer("☹️ У вас еще нет карт выбранной редкости")
-		await g_bot.answer_callback_query(query.id)
-		return
-	
-	if offset >= len(my_cards_by_rarity_unique):
-		offset = 0
-		async with state.proxy() as storage:
-			storage["my_cards_offset"] = offset
-	nl = "\n"
-	# get 
-	card_to_show = await orm.get_card_by_cardID(my_cards_by_rarity_unique[offset])
-	caption = f"""🗞 {card_to_show.card_name}
-👀 Редкость: {rarities.get(card_to_show.card_rarity)}{nl + "<b>💎 Limited</b>" if card_to_show.card_target == "limited" else ""}
-💸 +{card_to_show.card_weight}₽
+    card_to_show = await orm.get_card_by_cardID(unique_cards[offset])
+    if not card_to_show:
+        await query.answer("Ошибка загрузки карты")
+        return
 
-🃏 Количество: {my_cards_by_rarity.count(card_to_show.card_id)}"""
+    # Формируем описание карты
+    card_count = my_cards_by_rarity.count(card_to_show.card_id)
+    caption = (
+        f"🗞 {card_to_show.card_name}\n"
+        f"👀 Редкость: {rarities.get(card_to_show.card_rarity, 'Неизвестно')}\n"
+        f"{'<b>💎 Limited</b>\n' if card_to_show.card_target == 'limited' else ''}"
+        f"💸 +{card_to_show.card_weight}₽\n\n"
+        f"🃏 Количество: {card_count}"
+    )
 
-	if query.data.startswith("my_cards_"):
-		try:
-			await query.message.delete()
-		except:
-			pass
+    try:
+        if query.data.startswith("my_cards_"):
+            await query.message.delete()
+            await query.message.answer_photo(
+                photo=card_to_show.card_image,
+                caption=caption,
+                reply_markup=get_opened_card_ikb(
+                    offset=offset,
+                    max_offset=len(unique_cards)
+                )
+            )
+        else:
+            await query.message.edit_media(
+                media=types.InputMediaPhoto(
+                    media=card_to_show.card_image,
+                    caption=caption
+                ),
+                reply_markup=get_opened_card_ikb(
+                    offset=offset,
+                    max_offset=len(unique_cards)
+                )
+            )
+    except Exception as e:
+        print(f"Error processing card: {e}")
+        await query.answer("Произошла ошибка")
 
-		await query.message.answer_photo(
-			photo = card_to_show.card_image,
-			caption = caption,
-			reply_markup = get_opened_card_ikb(offset = offset, max_offset = len(my_cards_by_rarity_unique))
-		)
-	else:
-		await query.message.edit_media(
-			media = types.InputMediaPhoto(media = card_to_show.card_image, caption = caption),
-			reply_markup = get_opened_card_ikb(
-				offset = offset,
-				max_offset = len(my_cards_by_rarity_unique)
-			)
-		)
-
-	await g_bot.answer_callback_query(query.id)
-
-
-async def process_myCards_pickCategory_next(query: types.CallbackQuery, state: FSMContext):
-
-	async with state.proxy() as storage:
-		storage["my_cards_offset"] = storage.get("my_cards_offset", -1) + 1
-
-	await process_myCards_pickCategory(query, state)
-
-	await g_bot.answer_callback_query(query.id)
+    await query.answer()
 
 
-async def process_myCards_pickCategory_prev(query: types.CallbackQuery, state: FSMContext):
+async def process_my_cards_pick_category_next(query: types.CallbackQuery, state: FSMContext):
+    """Обработчик кнопки 'Следующая'"""
+    data = await state.get_data()
+    offset = data.get("my_cards_offset", 0)
+    await state.update_data(my_cards_offset=offset + 1)
+    await process_my_cards_pick_category(query, state)
+    await query.answer()
 
-	async with state.proxy() as storage:
-		storage["my_cards_offset"] = storage.get("my_cards_offset", 1) - 1
 
-	await process_myCards_pickCategory(query, state)
+async def process_my_cards_pick_category_prev(query: types.CallbackQuery, state: FSMContext):
+    """Обработчик кнопки 'Предыдущая'"""
+    data = await state.get_data()
+    offset = data.get("my_cards_offset", 1)
+    await state.update_data(my_cards_offset=offset - 1)
+    await process_my_cards_pick_category(query, state)
+    await query.answer()
 
-	await g_bot.answer_callback_query(query.id)
 
-
-async def process_myCards_pickCategory_page_status(query: types.CallbackQuery, state: FSMContext):
-
-	await g_bot.answer_callback_query(query.id)
+async def process_my_cards_page_status(query: types.CallbackQuery, state: FSMContext):
+    """Обработчик статуса страницы"""
+    await query.answer()

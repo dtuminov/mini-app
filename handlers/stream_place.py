@@ -20,7 +20,7 @@ def load_stream_place_handler(dispatcher: Dispatcher, bot: Bot):
 	# main handler
 	dispatcher.message.register(
 		process_streamPlace_msg,
-		F.Text(equals = "🏛 Invest Place"),
+		lambda message: message.text == "🏛 Invest Place",
 		StateFilter('*')
 	)
 
@@ -40,7 +40,8 @@ async def process_streamPlace_msg(message: types.Message, state: FSMContext):
 		reply_markup = get_streamplace_ikb()
 	)
 
-	await MainStates.main.set()
+	await state.set_state(MainStates.main)  # Исправленная строка
+
 
 
 async def process_streamPlace_query(query: types.CallbackQuery, state: FSMContext):
@@ -60,6 +61,6 @@ async def process_streamPlace_query(query: types.CallbackQuery, state: FSMContex
 			reply_markup = get_streamplace_ikb()
 		)
 	
-	await MainStates.main.set()
+	await state.set_state(MainStates.main)
 
 	await g_bot.answer_callback_query(query.id)

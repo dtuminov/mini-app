@@ -3,132 +3,74 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 def get_rarity_choose_ikb():
+	buttons = [
+		[InlineKeyboardButton(text="Классические", callback_data="my_cards_classic")],
+		[InlineKeyboardButton(text="Редкие", callback_data="my_cards_rare")],
+		[InlineKeyboardButton(text="Супер редкие", callback_data="my_cards_superRare")],
+		[InlineKeyboardButton(text="Ультра редкие", callback_data="my_cards_ultraRare")],
+		[InlineKeyboardButton(text="Акции", callback_data="my_cards_stock")]
+	]
 
-	inline_markup = InlineKeyboardMarkup(row_width = 1)
-
-	classic_btn = InlineKeyboardButton(
-		text = "🟠 Классическая",
-		callback_data = "my_cards_classic"
-	)
-
-	rare_btn = InlineKeyboardButton(
-		text = "🟢 Редкая",
-		callback_data = "my_cards_rare"
-	)
-
-	superRare_btn = InlineKeyboardButton(
-		text = "🔵 Супер-редкая",
-		callback_data = "my_cards_superRare"
-	)
-
-	ultraRare_btn = InlineKeyboardButton(
-		text = "🔴 Ультра-редкая",
-		callback_data = "my_cards_ultraRare"
-	)
-
-	stock_btn = InlineKeyboardButton(
-		text = "📈 Акция",
-		callback_data = "my_cards_stock"
-	)
-
-	inline_markup.add(classic_btn, rare_btn, superRare_btn, ultraRare_btn, stock_btn)
-
-	return inline_markup
+	return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_opened_card_ikb(offset: int, max_offset: int, choose_btn: bool = False, current_card_id: int = -1, prefix: str = "opened_cards", target_id: int = -1, back_to_streamplace: bool = False):
+def get_opened_card_ikb(offset: int, max_offset: int):
+	buttons = []
 
-	inline_markup = InlineKeyboardMarkup(row_width = 1)
+	# Кнопки навигации
+	nav_buttons = []
+	if offset > 0:
+		nav_buttons.append(InlineKeyboardButton(text="⬅️", callback_data="opened_cards_prev_page"))
 
-	offset += 1
+	nav_buttons.append(InlineKeyboardButton(
+		text=f"{offset + 1}/{max_offset}",
+		callback_data="opened_cards_page_status"
+	))
 
-	prev_page_btn = InlineKeyboardButton(
-		text = "⬅️",
-		callback_data = f"{prefix}_prev_page"
-	)
+	if offset < max_offset - 1:
+		nav_buttons.append(InlineKeyboardButton(text="➡️", callback_data="opened_cards_next_page"))
 
-	status_btn = InlineKeyboardButton(
-		text = f"{offset}/{max_offset}",
-		callback_data = f"{prefix}_page_status"
-	)
+	if nav_buttons:
+		buttons.append(nav_buttons)
 
-	next_page_btn = InlineKeyboardButton(
-		text = "➡️",
-		callback_data = f"{prefix}_next_page"
-	)
+	# Кнопка "Назад"
+	buttons.append([InlineKeyboardButton(text="🔙 Назад", callback_data="opened_cards_back")])
 
-	back_btn = InlineKeyboardButton(
-		text = "🔙 Назад" if not back_to_streamplace else "🔙 Вернуться в Invest Place",
-		callback_data = f"{prefix}_back" if not back_to_streamplace else "back_to_streamplace"
-	)
-
-	if choose_btn:
-		choose_btn = InlineKeyboardButton(
-			text = "✅ Выбрать карту",
-			callback_data = f"{prefix}_choose_{current_card_id}"
-		)
-		inline_markup.add(choose_btn)
-
-	if offset == 1 and max_offset == 1:
-		inline_markup.add(status_btn)
-	elif offset == max_offset:
-		inline_markup.row(prev_page_btn, status_btn)
-	elif offset == 1:
-		inline_markup.row(status_btn, next_page_btn)
-	elif offset != 1:
-		inline_markup.row(prev_page_btn, status_btn, next_page_btn)
-
-	if not choose_btn:
-		inline_markup.add(back_btn)
-	else:
-		close_btn = InlineKeyboardButton(
-			text = "🧨 Отменить",
-			callback_data = f"sendTrade_deny_{target_id}"
-		)
-		inline_markup.add(close_btn)
-
-	return inline_markup
-
-
+	return InlineKeyboardMarkup(inline_keyboard=buttons)
 def get_streamplace_ikb():
-
-	inline_markup = InlineKeyboardMarkup(row_width = 1)
-
-	influence_btn = InlineKeyboardButton(
-		text = "🏆 Influence",
-		callback_data = "streamPlace_influence"
-	)
-
-	my_account_btn = InlineKeyboardButton(
-		text = "👨‍💻 My account",
-		callback_data = "streamPlace_account"
-	)
-
-	jumanji_btn = InlineKeyboardButton(
-		text = "✈️ Games",
-		callback_data = "streamPlace_jumanji"
-	)
-
-	craft_btn = InlineKeyboardButton(
-		text = "🛠 Craft",
-		callback_data = "streamPlace_craft"
-	)
-
-	trade_btn = InlineKeyboardButton(
-		text = "🔄 Trade",
-		callback_data = "streamPlace_trade"
-	)
-
-	inline_markup.add(
-		influence_btn,
-		my_account_btn,
-		jumanji_btn,
-		craft_btn,
-		trade_btn
-	)
-
-	return inline_markup
-
+    buttons = [
+        [
+            InlineKeyboardButton(
+                text="🏆 Influence",
+                callback_data="streamPlace_influence"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="👨‍💻 My account",
+                callback_data="streamPlace_account"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="✈️ Games",
+                callback_data="streamPlace_jumanji"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🛠 Craft",
+                callback_data="streamPlace_craft"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔄 Trade",
+                callback_data="streamPlace_trade"
+            )
+        ]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 def get_url_ikb(url: str):
 

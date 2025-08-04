@@ -116,6 +116,7 @@ def load_sp_jumanji_handler(dispatcher: Dispatcher, bot: Bot):
 
 
 async def process_streamPlace_jumanji(query: types.CallbackQuery, state: FSMContext):
+	await query.answer()
 
 	msg_text = "✈️ Выберите игру:"
 	

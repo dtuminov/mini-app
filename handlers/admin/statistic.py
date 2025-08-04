@@ -2,6 +2,7 @@
 from aiogram import Dispatcher, types, filters, Bot, F
 from aiogram.enums import ParseMode
 from aiogram.filters import StateFilter
+from aiogram.fsm.state import any_state
 from aiogram.types import ContentType
 from aiogram.fsm.context import FSMContext
 
@@ -23,7 +24,7 @@ def load_admin_statistic_handler(dispatcher: Dispatcher, bot: Bot):
 	dispatcher.message.register(
 		process_statistic,
 		F.Text(equals = ["📊 Статистика"]),
-		StateFilter(AdminStates.main_menu)
+		StateFilter(any_state)
 
 	)
 

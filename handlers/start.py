@@ -22,7 +22,6 @@ def load_start_handler(dp: Dispatcher):
     dp.message.register(process_start, CommandStart())
 
 
-
 async def process_start(message: Message, state: FSMContext):
     # Очищаем состояние
     await state.clear()

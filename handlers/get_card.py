@@ -1,8 +1,8 @@
 # Aiogram imports
-from aiogram import Dispatcher, types, Bot
+from aiogram import Dispatcher, types, Bot, F
 from aiogram.filters import StateFilter
-
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import any_state
 
 # Keyboards
 from keyboards.reply_keyboards import get_main_kb
@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 
 # loader
 # loader
-def load_get_card_handler(dispatcher: Dispatcher, bot:Bot):
+def load_get_card_handler(dispatcher: Dispatcher, bot: Bot):
     # init
     global g_bot, channel_id, channel_link, rarities
     g_bot = bot  # Use the passed bot instance instead of dispatcher.bot
@@ -38,140 +38,140 @@ def load_get_card_handler(dispatcher: Dispatcher, bot:Bot):
     # main handler
     dispatcher.message.register(
         process_get_card,
-        lambda message: message.text == "🤵🏻‍♂️ Стать инвестором",
-		StateFilter(MainStates.main)
+        lambda message: message.text == '🤵🏻‍♂️ Стать инвестором',
+        StateFilter(any_state) #было mainsatte
     )
 
+
 async def process_get_card(message: types.Message, state: FSMContext):
+    ### RESET STATE
 
-	### RESET STATE
-	await state.reset_state(with_data = True)
+    await state.clear()
 
-	### RANDOM DELAY
-	await asyncio.sleep(random.uniform(0.5, 1.0))
+    ### RANDOM DELAY
+    await asyncio.sleep(random.uniform(0.5, 1.0))
 
-	### CHECK FREEZE
-	user = await orm.get_user(user_id = message.from_user.id)
+    ### CHECK FREEZE
+    user = await orm.get_user(user_id=message.from_user.id)
 
-	if user.freeze != 0:
-		await message.answer(f"☃️ Вы заморожены на {user.freeze}ч!")
-		await MainStates.main.set()
-		return
-	###
+    if user.freeze != 0:
+        await message.answer(f"☃️ Вы заморожены на {user.freeze}ч!")
+        await MainStates.main.set()
+        return
+    ###
 
-	### CHECK CHANNEL SUB
-	if len(user.inventory) != 0:
-		try:
-			chat_member = await g_bot.get_chat_member(channel_id, message.from_user.id)
-			chat_member_check = isinstance(chat_member, types.ChatMember) and chat_member.status != "left"
+    ### CHECK CHANNEL SUB
+    if len(user.inventory) != 0:
+        try:
+            chat_member = await g_bot.get_chat_member(channel_id, message.from_user.id)
+            chat_member_check = isinstance(chat_member, types.ChatMember) and chat_member.status != "left"
 
-			if not chat_member_check:
-				await message.answer(
-					text = "🔗 Для доступа ко всем возможностям бота необходимо подписаться на канал по кнопке ниже",
-					reply_markup = get_url_ikb(channel_link)
-				)
-				await MainStates.main.set()
-				return
-		except:
-			pass
-	###
+            if not chat_member_check:
+                await message.answer(
+                    text="🔗 Для доступа ко всем возможностям бота необходимо подписаться на канал по кнопке ниже",
+                    reply_markup=get_url_ikb(channel_link)
+                )
+                await MainStates.main.set()
+                return
+        except:
+            pass
+    ###
 
-	### CHECK FREE_ATTEMPT COOLDOWN
-	me = await orm.get_user(message.from_user.id)
-	
-	if datetime.utcnow() >= (user.upd_date + timedelta(hours = 4)):
-		user.attempts += 1
-		await orm.set_users_field(user.user_id, "attempts", user.attempts)
+    ### CHECK FREE_ATTEMPT COOLDOWN
+    me = await orm.get_user(message.from_user.id)
 
-	### RANDOM DELAY
-	await asyncio.sleep(random.uniform(0.2, 0.4))
+    if datetime.utcnow() >= (user.upd_date + timedelta(hours=4)):
+        user.attempts += 1
+        await orm.set_users_field(user.user_id, "attempts", user.attempts)
 
-	### CHECK ATTEMPTS
-	if user.attempts == 0:
-		await message.answer(
-			text = f"⏰ Следущая попытка будет доступна через {seconds_to_str((user.upd_date + timedelta(hours = 4) - datetime.utcnow()).total_seconds())}."
-		)
-		await MainStates.main.set()
-		return
-	###
+    ### RANDOM DELAY
+    await asyncio.sleep(random.uniform(0.2, 0.4))
 
-	### GET CARD
-	# choose rarity
-	random_number = random.randint(1, 200)
+    ### CHECK ATTEMPTS
+    if user.attempts == 0:
+        await message.answer(
+            text=f"⏰ Следущая попытка будет доступна через {seconds_to_str((user.upd_date + timedelta(hours=4) - datetime.utcnow()).total_seconds())}."
+        )
+        await MainStates.main.set()
+        return
+    ###
 
-	if random_number == 200:
-		rarity = "stock"
-	if random_number >= 190:
-		rarity = "ultraRare"
-	elif random_number >= 170:
-		rarity = "superRare"
-	elif random_number >= 110:
-		rarity = "rare"
-	else:
-		rarity = "classic"
+    ### GET CARD
+    # choose rarity
+    random_number = random.randint(1, 200)
 
-	# get cards
-	all_cards_by_rarity = await orm.get_cards_by_rarity_for_drop(rarity = rarity)
-	
-	# pick random card
-	my_new_card = random.choice(all_cards_by_rarity)
-	###
-	
-	### CHECK ATTEMPTS
-	user = await orm.get_user(user_id = message.from_user.id)
+    if random_number == 200:
+        rarity = "stock"
+    if random_number >= 190:
+        rarity = "ultraRare"
+    elif random_number >= 170:
+        rarity = "superRare"
+    elif random_number >= 110:
+        rarity = "rare"
+    else:
+        rarity = "classic"
 
-	if user.attempts == 0:
-		await message.answer(
-			text = f"⏰ Следущая попытка будет доступна через {seconds_to_str((user.upd_date + timedelta(hours = 4) - datetime.utcnow()).total_seconds())}."
-		)
-		await MainStates.main.set()
-		return
-	else:
-		await orm.set_users_field(user.user_id, "attempts", user.attempts - 1)
-	###
+    # get cards
+    all_cards_by_rarity = await orm.get_cards_by_rarity_for_drop(rarity=rarity)
+    # pick random card
+    my_new_card = random.choice(all_cards_by_rarity)
+    ###
 
-	### COLLECT DATA
-	user = await orm.get_user(user_id = message.from_user.id)
+    ### CHECK ATTEMPTS
+    user = await orm.get_user(user_id=message.from_user.id)
 
-	user.inventory.append(my_new_card.card_id)
-	user.points += my_new_card.card_weight
-	user.season_points += my_new_card.card_weight
-	###
+    if user.attempts == 0:
+        await message.answer(
+            text=f"⏰ Следущая попытка будет доступна через {seconds_to_str((user.upd_date + timedelta(hours=4) - datetime.utcnow()).total_seconds())}."
+        )
+        await MainStates.main.set()
+        return
+    else:
+        await orm.set_users_field(user.user_id, "attempts", user.attempts - 1)
+    ###
 
-	### PUSH TO DB
-	await orm.set_users_field(user.user_id, "inventory", user.inventory)
-	await orm.set_users_field(user.user_id, "points",  user.points)
-	await orm.set_users_field(user.user_id, "season_points", user.season_points)
-	await orm.set_users_field(user.user_id, "upd_date", datetime.utcnow())
-	###
+    ### COLLECT DATA
+    user = await orm.get_user(user_id=message.from_user.id)
 
-	### SHOW CARD IN CHAT
-	caption = f"""🗞 {my_new_card.card_name}
+    user.inventory.append(my_new_card.card_id)
+    user.points += my_new_card.card_weight
+    user.season_points += my_new_card.card_weight
+    ###
+
+    ### PUSH TO DB
+    await orm.set_users_field(user.user_id, "inventory", user.inventory)
+    await orm.set_users_field(user.user_id, "points", user.points)
+    await orm.set_users_field(user.user_id, "season_points", user.season_points)
+    await orm.set_users_field(user.user_id, "upd_date", datetime.utcnow())
+    ###
+
+    ### SHOW CARD IN CHAT
+    caption = f"""🗞 {my_new_card.card_name}
 👀 Редкость: {rarities.get(my_new_card.card_rarity)}
 💸 +{my_new_card.card_weight:,}₽
 
 Рублей за все время: {user.points:,}
 Рублей за текущий сезон: {user.season_points:,}"""
 
-	if user.attempts <= 0:
-		caption += f"\n\n⏰ Следущая попытка будет доступна через 4 часа."
-	else:
-		caption += f"\n\n🤵🏻‍♂️ У вас есть еще {user.attempts} попыток."
+    if user.attempts <= 0:
+        caption += f"\n\n⏰ Следущая попытка будет доступна через 4 часа."
+    else:
+        caption += f"\n\n🤵🏻‍♂️ У вас есть еще {user.attempts} попыток."
 
-	await message.answer_photo(
-		photo = my_new_card.card_image,
-		caption = caption,
-		reply_markup = get_main_kb()
-	)
-	###
+    await message.answer_photo(
+        photo=my_new_card.card_image,
+        caption=caption,
+        reply_markup=get_main_kb()
+    )
+    ###
 
-	## CREATE TRANSACTION
-	await orm.create_transaction(
-		transaction_user_id = message.from_user.id,
-		transaction_type = "get_card",
-		transaction_date = datetime.utcnow(),
-		transaction_in = ["card", str(my_new_card.card_id)],
-		transaction_out = ["attempts", "1"]
-	)
+    ## CREATE TRANSACTION
+    await orm.create_transaction(
+        transaction_user_id=message.from_user.id,
+        transaction_type="get_card",
+        transaction_date=datetime.utcnow(),
+        transaction_in=["card", str(my_new_card.card_id)],
+        transaction_out=["attempts", "1"]
+    )
 
-	await MainStates.main.set()
+    await MainStates.main.set()
